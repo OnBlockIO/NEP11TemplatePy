@@ -4,7 +4,7 @@ Fully featured NEP11 python contract to allow to easily deploy your own NFT mint
 
 ## Contract overview
 
-The contract features a generic mint() method, a burn() method, has builtin support for royalties and is pausable and updatable (restricted to owner). On top of that its possible to add or remove authorized addresses, allowed to interact with the contrat admin functions (pause / mint / etc.)
+The contract features a generic mint() method, a burn() method, has builtin support for royalties and is pausable and updatable (restricted to owner). On top of that its possible to add or remove authorized addresses, allowed to interact with the contract admin functions (pause / mint / etc.)
 
 
 ## What to replace
