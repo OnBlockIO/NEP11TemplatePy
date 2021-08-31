@@ -1,6 +1,4 @@
 # NEP11TemplatePy
-A template for a NEP11 contract written in python
-
 Fully featured NEP11 python contract to allow to easily deploy your own NFT minting contract, and make it seamless to integrate it on GhostMarket.
 
 
@@ -22,7 +20,7 @@ The contract features a generic mint() method, a burn() method, has builtin supp
 
 ## Royalties
 
-This template features royalties for NFT. For each sale happening on GhostMarket trading contract, a configurable percentage will be sent to the original creator (minter) if configured. It has to be passed as an array during minting, and follow a json structure. Note that the value is in BPS (ie 10% is 1000). We support multiple royalties, up to a maximum combined of 50% royalties.
+This template features royalties for NFT. For each sale happening on GhostMarket trading contract, a configurable percentage will be sent to the original creator (minter) if configured. It has to be passed as an array during minting, and follow a json structure. Note that the value is in BPS (ie 10% is 1000). We support multiple royalties, up to a maximum combined of 50% royalties. Note that if a NFT has royalties, our current implementation prevent it to be traded against indivisible currencies (like NEO), but if it does not have royalties it's allowed.
 
 `[{"address":"NNau7VyBMQno89H8aAyirVJTdyLVeRxHGy","value":"1000"}]`
 
