@@ -25,9 +25,9 @@ def manifest_metadata() -> NeoMetadata:
     Defines this smart contract's metadata information
     """
     meta = NeoMetadata()
-    meta.author = "Template Author"
-    meta.description = "Some Description"
-    meta.email = "hello@example.com"
+    meta.author = "Template Author" # TODO_TEMPLATE
+    meta.description = "Some Description" # TODO_TEMPLATE
+    meta.email = "hello@example.com" # TODO_TEMPLATE
     meta.supportedstandards = ["NEP-11"]
     meta.permissions = [{"contract": "*","methods": "*"}]
     return meta
@@ -69,6 +69,7 @@ ROYALTIES_PREFIX = b'RYP'
 
 TOKEN_COUNT = b'TOKEN_COUNT'
 AUTH_ADDRESSES = b'AUTH_ADDRESSES'
+
 
 # -------------------------------------------
 # Events
@@ -332,7 +333,8 @@ def onNEP17Payment(from_address: UInt160, amount: int, data: Any):
     :param data: any pertinent data that might validate the transaction
     :type data: Any
     """
-    # TODO_TEMPLATE
+    # TODO_TEMPLATE: add own logic if necessary, or uncomment below to prevent any NEP17 except GAS to be sent to the contract
+    # (as a failsafe, but would prevent any minting fee logic)
     # if calling_script_hash != GAS:
     #     abort()
 
@@ -372,7 +374,7 @@ def mint(account: UInt160, meta: bytes, royalties: bytes, data: Any) -> bytes:
     """
     assert not isPaused(), "Contract is currently paused"
 
-    # TODO_TEMPLATE: add own logic if necessary, like only a contract admint is allowed to mint
+    # TODO_TEMPLATE: add own logic if necessary, or uncomment below to restrict minting to contract authorized addresses
     # assert verify(), '`acccount` is not allowed to mint'
     assert check_witness(account), "Invalid witness" 
 
