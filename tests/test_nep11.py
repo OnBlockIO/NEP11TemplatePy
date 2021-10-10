@@ -30,7 +30,7 @@ class NEP11Test(BoaTest):
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
     TOKEN_META = bytes('{ "name": "NEP11", "description": "Some description", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
-    ROYALTIES = bytes('[{"address": "NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN", "value": 20}, {"address": "NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB", "value": 30}]', 'utf-8')
+    ROYALTIES = bytes('[{"address": "NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN", "value": 2000}, {"address": "NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB", "value": 3000}]', 'utf-8')
 
     def build_contract(self, preprocess=False):
         print('contract path: ' + self.CONTRACT_PATH_PY)
