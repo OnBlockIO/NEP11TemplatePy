@@ -271,7 +271,25 @@ def tokens() -> Iterator:
     return find(TOKEN_PREFIX)
 
 @public
-def properties(tokenId: bytes) -> bytes:
+def properties(tokenId: bytes) -> Dict[str, str]:
+    """
+    Get the properties of a token.
+
+    The parameter tokenId SHOULD be a valid NFT. If no metadata is found (invalid tokenId), an exception is thrown.
+
+    :param tokenId: the token for which to check the properties
+    :type tokenId: ByteString
+    :return: a serialized NVM object containing the properties for the given NFT.
+    :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
+    """
+    metaBytes = get_meta(tokenId)
+    assert len(metaBytes) != 0, 'No metadata available for token'
+    metaObject = cast(Dict[str, str], json_deserialize(metaBytes))
+
+    return metaObject
+
+@public
+def propertiesJson(tokenId: bytes) -> bytes:
     """
     Get the properties of a token.
 
