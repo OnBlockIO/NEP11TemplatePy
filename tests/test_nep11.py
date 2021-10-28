@@ -24,9 +24,10 @@ class NEP11Test(BoaTest):
     CONTRACT_PATH_PY = NEP11_ROOT + '/contracts/NEP11/NEP11-Template.py'
 
     # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/home/merl/source/n3_gm/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
+    TEST_ENGINE_PATH = '/home/merl/source/onblock/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
+    # OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NaCEUqriRmYeH9AKH11FvKGDJ1jWgBwAzi'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
     TOKEN_META = bytes('{ "name": "NEP11", "description": "Some description", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
@@ -37,24 +38,30 @@ class NEP11Test(BoaTest):
         if preprocess:
             import os
             old = os.getcwd()
-            os.chdir(self.NEP11_ROOT)
-            file = self.NEP11_ROOT + '/compile.py'
+            os.chdir(self.GHOST_ROOT)
+            file = self.GHOST_ROOT + '/compile.py'
             os.system(file)
             os.chdir(old)
         else:
             output, manifest = self.compile_and_save(self.CONTRACT_PATH_PY)
+            self.CONTRACT = hash160(output)
 
     def deploy_contract(self, engine):
-        engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
-        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', None, False,
+        # engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
+        engine.add_signer_account(self.OWNER_SCRIPT_HASH)
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', self.OWNER_SCRIPT_HASH, False,
                                          signer_accounts=[self.OWNER_SCRIPT_HASH],
                                          expected_result_type=bool)
-        self.assertEqual(VoidType, result)
+        storage = engine.storage.to_json()
+        for i in range(0, len(storage)):
+            print(storage[i])
+        #self.assertEqual(VoidType, result)
 
     def prepare_testengine(self, preprocess=False) -> TestEngine:
         self.build_contract(preprocess)
         engine = TestEngine(self.TEST_ENGINE_PATH)
         engine.reset_engine()
+        
         self.deploy_contract(engine)
         return engine
 
@@ -95,9 +102,7 @@ class NEP11Test(BoaTest):
         engine = self.prepare_testengine()
         # prepare_testengine already deploys the contract and verifies it's successfully deployed
 
-        # must always return false after first execution
-        with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
-            result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', None, False,
+        result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', None, False,
                                              signer_accounts=[self.OWNER_SCRIPT_HASH],
                                          expected_result_type=bool)
         self.print_notif(engine.notifications)
@@ -140,10 +145,56 @@ class NEP11Test(BoaTest):
         engine = self.prepare_testengine()
 
         # should fail because account does not have enough for fees
-        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
-            self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify', self.OTHER_ACCOUNT_1)
+        verified = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
+                signer_accounts=[self.OTHER_ACCOUNT_2],
+                expected_result_type=bool)
+        self.assertEqual(verified, False)
+
+        addresses = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getAuthorizedAddress',
+                expected_result_type=list[UInt160],
+                signer_accounts=[self.OWNER_SCRIPT_HASH])
+        print(addresses)
+        self.assertEqual(addresses[0], self.OWNER_SCRIPT_HASH)
+        self.assertEqual(len(addresses), 1)
+
+        verified = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
+                signer_accounts=[self.OTHER_ACCOUNT_1],
+                expected_result_type=bool)
+        self.assertEqual(verified, False)
+
+        verified = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
+                signer_accounts=[self.OTHER_ACCOUNT_2],
+                expected_result_type=bool)
+        self.assertEqual(verified, False)
+
+        verified = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'verify',
+                signer_accounts=[self.OWNER_SCRIPT_HASH],
+                expected_result_type=bool)
+        self.assertEqual(verified, True)
 
         self.print_notif(engine.notifications)
+
+    def test_nep11_authorize_2(self):
+        engine = self.prepare_testengine()
+        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setAuthorizedAddress', 
+                self.OTHER_ACCOUNT_1, True,
+                signer_accounts=[self.OWNER_SCRIPT_HASH],
+                expected_result_type=bool)
+        auth_events = engine.get_events('Authorized')
+
+        # check if the event was triggered and the address was authorized
+        self.assertEqual(0, auth_events[0].arguments[1])
+        self.assertEqual(1, auth_events[0].arguments[2])
+
+        # now deauthorize the address
+        self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'setAuthorizedAddress', 
+                self.OTHER_ACCOUNT_1, False,
+                signer_accounts=[self.OWNER_SCRIPT_HASH],
+                expected_result_type=bool)
+        auth_events = engine.get_events('Authorized')
+        # check if the event was triggered and the address was authorized
+        self.assertEqual(0, auth_events[1].arguments[1])
+        self.assertEqual(0, auth_events[1].arguments[2])
 
     def test_nep11_authorize(self):
         engine = self.prepare_testengine()

@@ -7,11 +7,13 @@ from boa3.builtin.interop.contract import NEO, GAS, call_contract, destroy_contr
 from boa3.builtin.interop.runtime import notify, log, calling_script_hash, executing_script_hash, check_witness, script_container
 from boa3.builtin.interop.stdlib import serialize, deserialize, base58_encode
 from boa3.builtin.interop.storage import delete, get, put, find, get_context
+from boa3.builtin.interop.storage.findoptions import FindOptions
 from boa3.builtin.interop.iterator import Iterator
 from boa3.builtin.interop.crypto import ripemd160, sha256
 from boa3.builtin.type import UInt160, UInt256
 from boa3.builtin.interop.contract import CallFlags
 from boa3.builtin.interop.json import json_serialize, json_deserialize
+from boa3.builtin.interop.runtime import get_network
 
 
 
@@ -217,10 +219,12 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
 
     if (token_owner != to):
         set_balance(token_owner, -1)
+        remove_token_account(token_owner, tokenId)
 
         set_balance(to, 1)
 
         set_owner_of(tokenId, to)
+        add_token_account(to, tokenId)
     post_transfer(token_owner, to, tokenId, data)
     return True
 
@@ -267,8 +271,9 @@ def tokens() -> Iterator:
 
     :return: an iterator that contains all of the tokens minted by the contract.
     """
-    debug(['tokens: ', find(TOKEN_PREFIX)])
-    return find(TOKEN_PREFIX)
+    flags = FindOptions.REMOVE_PREFIX | FindOptions.KEYS_ONLY
+    context = get_context()
+    return find(TOKEN_PREFIX, context, flags)
 
 @public
 def properties(tokenId: bytes) -> Dict[str, str]:
@@ -282,7 +287,7 @@ def properties(tokenId: bytes) -> Dict[str, str]:
     :return: a serialized NVM object containing the properties for the given NFT.
     :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
     """
-    metaBytes = get_meta(tokenId)
+    metaBytes = cast(str, get_meta(tokenId))
     assert len(metaBytes) != 0, 'No metadata available for token'
     metaObject = cast(Dict[str, str], json_deserialize(metaBytes))
 
@@ -310,20 +315,40 @@ def _deploy(data: Any, upgrade: bool):
     """
     The contracts initial entry point, on deployment.
     """
+    debug(["deploy now"])
     if upgrade:
         return
 
     if get(DEPLOYED).to_bool():
-        abort()
+        return
 
     tx = cast(Transaction, script_container)
+    debug(["tx.sender: ", tx.sender, get_network()])
+    owner: UInt160 = tx.sender
+    network = get_network()
+#DEBUG_START
+#custom owner for tests, ugly hack, because TestEnginge sets an unkown tx.sender...
+    if data is not None and network == 860833102:
+        newOwner = cast(UInt160, data)
+        debug(["check", newOwner])
+        internal_deploy(newOwner)
+        return
 
+    if data is None and network == 860833102:
+        return
+#DEBUG_END
+    debug(["owner: ", owner])
+    internal_deploy(owner)
+
+def internal_deploy(owner: UInt160):
+
+    debug(["internal: ", owner])
     put(DEPLOYED, True)
     put(PAUSED, False)
     put(TOKEN_COUNT, 0)
 
     auth: List[UInt160] = []
-    auth.append(tx.sender)
+    auth.append(owner)
     serialized = serialize(auth)
     put(AUTH_ADDRESSES, serialized)
 
@@ -413,6 +438,28 @@ def getRoyalties(tokenId: bytes) -> bytes:
     return royalties
 
 @public
+def getAuthorizedAddress() -> list[UInt160]:
+    """
+    Configure authorized addresses.
+
+    When this contract address is included in the transaction signature,
+    this method will be triggered as a VerificationTrigger to verify that the signature is correct.
+    For example, this method needs to be called when withdrawing token from the contract.
+
+    :param address: the address of the account that is being authorized
+    :type address: UInt160
+    :param authorized: authorization status of this address
+    :type authorized: bool
+    :return: whether the transaction signature is correct
+    :raise AssertionError: raised if witness is not verified.
+    """
+    # assert verify(), '`acccount` is not allowed for setAuthorizedAddress'
+    serialized = get(AUTH_ADDRESSES)
+    auth = cast(list[UInt160], deserialize(serialized))
+
+    return auth
+
+@public
 def setAuthorizedAddress(address: UInt160, authorized: bool):
     """
     Configure authorized addresses.
@@ -490,9 +537,10 @@ def verify() -> bool:
     """
     serialized = get(AUTH_ADDRESSES)
     auth = cast(list[UInt160], deserialize(serialized))
+    tx = cast(Transaction, script_container)
     for addr in auth: 
         if check_witness(addr):
-            debug(["Verification successful", addr])
+            debug(["Verification successful", addr, tx.sender])
             return True
 
     debug(["Verification failed", addr])
@@ -543,6 +591,7 @@ def internal_burn(tokenId: bytes) -> bool:
     add_to_supply(-1)
     remove_meta(tokenId)
     remove_royalties(tokenId)
+    remove_token_account(owner, tokenId)
     
     post_transfer(owner, None, tokenId, None)
     return True
@@ -576,11 +625,22 @@ def internal_mint(account: UInt160, meta: bytes, royalties: bytes, data: Any) ->
     debug(['metadata: ', meta])
 
     if len(royalties) != 0:
-        add_royalties(tokenIdBytes, royalties)
+        add_royalties(tokenIdBytes, cast(str, royalties))
         debug(['royalties: ', royalties])
 
+    add_token_account(account, tokenIdBytes)
     post_transfer(None, account, tokenIdBytes, None)
     return tokenIdBytes
+
+def remove_token_account(holder: UInt160, tokenId: bytes):
+    key = mk_account_key(holder) + tokenId
+    debug(['add_token_account: ', key, tokenId])
+    delete(key)
+
+def add_token_account(holder: UInt160, tokenId: bytes):
+    key = mk_account_key(holder) + tokenId
+    debug(['add_token_account: ', key, tokenId])
+    put(key, tokenId)
 
 def get_token_data(tokenId: bytes) -> Union[bytes, None]:
     key = mk_token_data_key(tokenId)
@@ -647,7 +707,7 @@ def get_royalties(tokenId: bytes) -> bytes:
     val = get(key)
     return val
 
-def add_royalties(tokenId: bytes, royalties: bytes):
+def add_royalties(tokenId: bytes, royalties: str):
     key = mk_royalties_key(tokenId)
     debug(['add_royalties: ', key, tokenId])
     put(key, royalties)
