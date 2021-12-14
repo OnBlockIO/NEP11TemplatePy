@@ -45,7 +45,7 @@ This contract supports both methods for convenience purposes.
 
 Currently NEO-BOA doe not support tagging a method with a `safe` decorator. While this is optional, it is required for example if you want your NEP11 contract to use GhostMarket royalties feature, as GhostMarket trading contract checks through ABI that the `getRoyalties` is marked as `safe` to prevent potential exploits of this feature.
 
-To do so, since BOA does not support `safe` decorator yet, simply comment the manifest file after generation, and replace the methods you want to benefit from this feature, from `safe: false` to `safe: true`
+To do so, since BOA does not support `safe` decorator yet, simply edit the manifest file after generation, and replace the methods you want to benefit from this feature, from `safe: false` to `safe: true`
 
 ### Compiling contract
 ```
