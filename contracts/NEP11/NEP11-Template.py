@@ -30,7 +30,7 @@ def manifest_metadata() -> NeoMetadata:
     meta.author = "Template Author" # TODO_TEMPLATE
     meta.description = "Some Description" # TODO_TEMPLATE
     meta.email = "hello@example.com" # TODO_TEMPLATE
-    meta.supportedstandards = ["NEP-11"]
+    meta.supported_standards = ["NEP-11"]
     meta.permissions = [{"contract": "*","methods": "*"}]
     return meta
 
