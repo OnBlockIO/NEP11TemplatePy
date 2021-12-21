@@ -31,6 +31,7 @@ class NEP11Test(BoaTest):
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
     TOKEN_META = bytes('{ "name": "NEP11", "description": "Some description", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
+    TOKEN_LOCKED = bytes('lockedContent', 'utf-8')
     ROYALTIES = bytes('[{"address": "NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN", "value": 2000}, {"address": "NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB", "value": 3000}]', 'utf-8')
 
     def build_contract(self, preprocess=False):
@@ -241,7 +242,7 @@ class NEP11Test(BoaTest):
         # should fail because contract is paused
         with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
             token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                    aux_address, self.TOKEN_META, self.ROYALTIES, None,
+                    aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
                     signer_accounts=[aux_address],
                     expected_result_type=bytes)
 
@@ -252,7 +253,7 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.ROYALTIES, None,
+            aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
             signer_accounts=[aux_address],
             expected_result_type=bytes)
         self.print_notif(engine.notifications)
@@ -274,7 +275,7 @@ class NEP11Test(BoaTest):
 
         # should succeed now that account has enough fees
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
 
@@ -316,7 +317,7 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
         properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token)
@@ -372,7 +373,7 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
                 signer_accounts=[aux_address],
                 expected_result_type=bytes)
 
@@ -405,7 +406,7 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.ROYALTIES, None,
+            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
             signer_accounts=[self.OTHER_ACCOUNT_1],
             expected_result_type=bytes)
 

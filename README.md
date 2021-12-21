@@ -4,7 +4,7 @@ Fully featured NEP11 python contract to allow to easily deploy your own NFT mint
 
 ## Contract overview
 
-The contract features a generic mint() method, a burn() method, has builtin support for royalties and is pausable and updatable (restricted to owner). On top of that its possible to add or remove authorized addresses, allowed to interact with the contract admin functions (pause / mint / etc.)
+The contract features a generic mint() method, a burn() method, has builtin support for royalties, locked content and is pausable and updatable (restricted to owner). On top of that its possible to add or remove authorized addresses, allowed to interact with the contract admin functions (pause / mint / etc.)
 
 
 ## What to replace
@@ -28,6 +28,10 @@ Note that the value is in BPS (ie 10% is 1000). We support multiple royalties, u
 
 where `NNau7VyBMQno89H8aAyirVJTdyLVeRxHGy` would be getting 10% of all sales as royalties.
 
+## Locked Content
+
+This template features the built-in feature of GhostMarket related to lock content. When a NFT is minted directly from GhostMarket UI with this template, you can decide to store content (which is encrypted before storing it on smart contract), which can then only be retrieved by the current NFT owner (through a custom proprietary GhostMarket API).
+This is totally optional, and is currently only supported for NFT minted directly from GhostMarket (for the ones using this template), as it requires encryption before minting.
 
 ## Metadata
 

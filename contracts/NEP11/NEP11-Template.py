@@ -59,9 +59,11 @@ PAUSED = b'paused'
 ACCOUNT_PREFIX = b'ACC'
 TOKEN_PREFIX = b'TPF'
 TOKEN_DATA_PREFIX = b'TDP'
+LOCKED_PREFIX = b'LCP'
 BALANCE_PREFIX = b'BLP'
 SUPPLY_PREFIX = b'SPP'
 META_PREFIX = b'MDP'
+LOCKED_VIEW_COUNT_PREFIX = b'LVCP'
 ROYALTIES_PREFIX = b'RYP'
 
 
@@ -96,6 +98,14 @@ on_auth = CreateNewEvent(
         ('add', bool),
     ],
     'Authorized'
+)
+
+on_unlock = CreateNewEvent(
+    [
+        ('tokenId', bytes),
+        ('counter', int)
+    ],
+    'UnlockIncremented'
 )
 
 #DEBUG_START
@@ -400,7 +410,7 @@ def burn(tokenId: bytes) -> bool:
     return internal_burn(tokenId)
 
 @public
-def mint(account: UInt160, meta: bytes, royalties: bytes, data: Any) -> bytes:
+def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token.
 
@@ -408,6 +418,8 @@ def mint(account: UInt160, meta: bytes, royalties: bytes, data: Any) -> bytes:
     :type account: UInt160
     :param meta: the metadata to use for this token
     :type meta: bytes
+    :param lockedContent: the lock content to use for this token
+    :type lockedContent: bytes
     :param royalties: the royalties to use for this token
     :type royalties: bytes
     :param data: whatever data is pertinent to the mint method
@@ -421,7 +433,7 @@ def mint(account: UInt160, meta: bytes, royalties: bytes, data: Any) -> bytes:
     # assert verify(), '`acccount` is not allowed to mint'
     assert check_witness(account), "Invalid witness" 
 
-    return internal_mint(account, meta, royalties, data)
+    return internal_mint(account, meta, lockedContent, royalties, data)
 
 @public
 def getRoyalties(tokenId: bytes) -> bytes:
@@ -436,6 +448,40 @@ def getRoyalties(tokenId: bytes) -> bytes:
     royalties = get_royalties(tokenId)
     debug(['getRoyalties: ', royalties])
     return royalties
+
+@public
+def getLockedContentViewCount(tokenId: bytes) -> int:
+    """
+    Get lock content view count of a token.
+
+    :param tokenId: the token to query
+    :type tokenId: ByteString
+    :return: number of times the lock content of this token was accessed.
+    """
+    debug(['getLockedContentViewCount: ', get_locked_view_counter(tokenId)])
+    return get_locked_view_counter(tokenId)
+
+@public
+def getLockedContent(tokenId: bytes) -> bytes:
+    """
+    Get lock content of a token.
+
+    :param tokenId: the token to query
+    :type tokenId: ByteString
+    :return: the lock content of this token.
+    :raise AssertionError: raised if witness is not owner
+    :emits UnlockIncremented
+    """
+    owner = get_owner_of(tokenId)
+
+    assert check_witness(owner), "Prohibited access to locked content!"
+    set_locked_view_counter(tokenId)
+    
+    debug(['getLockedContent: ', get_locked_content(tokenId)])
+    content = get_locked_content(tokenId)
+    counter = get_locked_view_counter(tokenId)
+    on_unlock(tokenId, counter)
+    return content
 
 @public
 def getAuthorizedAddress() -> list[UInt160]:
@@ -590,13 +636,14 @@ def internal_burn(tokenId: bytes) -> bool:
     set_balance(owner, -1)
     add_to_supply(-1)
     remove_meta(tokenId)
+    remove_locked_content(tokenId)
     remove_royalties(tokenId)
     remove_token_account(owner, tokenId)
     
     post_transfer(owner, None, tokenId, None)
     return True
 
-def internal_mint(account: UInt160, meta: bytes, royalties: bytes, data: Any) -> bytes:
+def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, data: Any) -> bytes:
     """
     Mint new token - internal
 
@@ -604,6 +651,8 @@ def internal_mint(account: UInt160, meta: bytes, royalties: bytes, data: Any) ->
     :type account: UInt160
     :param meta: the metadata to use for this token
     :type meta: bytes
+    :param lockedContent: the lock content to use for this token
+    :type lockedContent: bytes
     :param royalties: the royalties to use for this token
     :type royalties: bytes
     :param data: whatever data is pertinent to the mint method
@@ -623,6 +672,10 @@ def internal_mint(account: UInt160, meta: bytes, royalties: bytes, data: Any) ->
 
     add_meta(tokenIdBytes, meta)
     debug(['metadata: ', meta])
+
+    if len(lockedContent) != 0:
+        add_locked_content(tokenIdBytes, lockedContent)
+        debug(['locked: ', lockedContent])
 
     if len(royalties) != 0:
         add_royalties(tokenIdBytes, cast(str, royalties))
@@ -701,6 +754,22 @@ def add_meta(tokenId: bytes, meta: bytes):
     debug(['add_meta: ', key, tokenId])
     put(key, meta)
 
+def get_locked_content(tokenId: bytes) -> bytes:
+    key = mk_locked_key(tokenId)
+    debug(['get_locked_content: ', key, tokenId])
+    val = get(key)
+    return val
+
+def remove_locked_content(tokenId: bytes):
+    key = mk_locked_key(tokenId)
+    debug(['remove_locked_content: ', key, tokenId])
+    delete(key)
+
+def add_locked_content(tokenId: bytes, content: bytes):
+    key = mk_locked_key(tokenId)
+    debug(['add_locked_content: ', key, tokenId])
+    put(key, content)
+
 def get_royalties(tokenId: bytes) -> bytes:
     key = mk_royalties_key(tokenId)
     debug(['get_royalties: ', key, tokenId])
@@ -716,6 +785,22 @@ def remove_royalties(tokenId: bytes):
     key = mk_royalties_key(tokenId)
     debug(['remove_royalties: ', key, tokenId])
     delete(key)
+
+def get_locked_view_counter(tokenId: bytes) -> int:
+    key = mk_lv_key(tokenId)
+    debug(['get_locked_view_counter: ', key, tokenId])
+    return get(key).to_int()
+
+def remove_locked_view_counter(tokenId: bytes):
+    key = mk_lv_key(tokenId)
+    debug(['remove_locked_view_counter: ', key, tokenId])
+    delete(key)
+
+def set_locked_view_counter(tokenId: bytes):
+    key = mk_lv_key(tokenId)
+    debug(['set_locked_view_counter: ', key, tokenId])
+    count = get(key).to_int() + 1
+    put(key, count)
 
 ## helpers
 
@@ -734,5 +819,11 @@ def mk_token_data_key(tokenId: bytes) -> bytes:
 def mk_meta_key(tokenId: bytes) -> bytes:
     return META_PREFIX + tokenId
 
+def mk_locked_key(tokenId: bytes) -> bytes:
+    return LOCKED_PREFIX + tokenId
+
 def mk_royalties_key(tokenId: bytes) -> bytes:
     return ROYALTIES_PREFIX + tokenId
+
+def mk_lv_key(tokenId: bytes) -> bytes:
+    return LOCKED_VIEW_COUNT_PREFIX + tokenId
