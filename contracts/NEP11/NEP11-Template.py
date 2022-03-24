@@ -3,8 +3,8 @@ from typing import Any, Dict, List, Union, cast, MutableSequence
 from boa3.builtin import CreateNewEvent, NeoMetadata, metadata, public
 from boa3.builtin.contract import Nep17TransferEvent, abort
 from boa3.builtin.interop.blockchain import get_contract, Transaction
-from boa3.builtin.interop.contract import NEO, GAS, call_contract, destroy_contract, update_contract
-from boa3.builtin.interop.runtime import notify, log, calling_script_hash, executing_script_hash, check_witness, script_container
+from boa3.builtin.interop.contract import call_contract, destroy_contract, update_contract
+from boa3.builtin.interop.runtime import check_witness, script_container
 from boa3.builtin.interop.stdlib import serialize, deserialize, base58_encode
 from boa3.builtin.interop.storage import delete, get, put, find, get_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
@@ -16,31 +16,28 @@ from boa3.builtin.interop.json import json_serialize, json_deserialize
 from boa3.builtin.interop.runtime import get_network
 
 
-
 # -------------------------------------------
 # METADATA
 # -------------------------------------------
-
 @metadata
-def manifest_metadata() -> NeoMetadata:
+def gm_manifest() -> NeoMetadata:
     """
     Defines this smart contract's metadata information
     """
     meta = NeoMetadata()
-    meta.author = "Template Author" # TODO_TEMPLATE
-    meta.description = "Some Description" # TODO_TEMPLATE
-    meta.email = "hello@example.com" # TODO_TEMPLATE
+    meta.author = "Template Author"  # TODO_TEMPLATE
+    meta.description = "Some Description"  # TODO_TEMPLATE
+    meta.email = "hello@example.com"  # TODO_TEMPLATE
     meta.supported_standards = ["NEP-11"]
-    meta.permissions = [{"contract": "*","methods": "*"}]
+    meta.add_permission(contract='*', methods=['*'])
     return meta
-
 
 # -------------------------------------------
 # TOKEN SETTINGS
 # -------------------------------------------
 
 # Symbol of the Token
-TOKEN_SYMBOL = 'EXMP' # TODO_TEMPLATE
+TOKEN_SYMBOL = 'EXMP'  # TODO_TEMPLATE
 
 # Number of decimal places
 TOKEN_DECIMALS = 0
@@ -108,7 +105,7 @@ on_unlock = CreateNewEvent(
     'UnlockIncremented'
 )
 
-#DEBUG_START
+# DEBUG_START
 # -------------------------------------------
 # DEBUG
 # -------------------------------------------
@@ -119,7 +116,8 @@ debug = CreateNewEvent(
     ],
     'Debug'
 )
-#DEBUG_END
+# DEBUG_END
+
 # -------------------------------------------
 # NEP-11 Methods
 # -------------------------------------------
@@ -193,7 +191,9 @@ def tokensOf(owner: UInt160) -> Iterator:
     :raise AssertionError: raised if `owner` length is not 20.
     """
     assert len(owner) == 20, "Incorrect `owner` length"
-    return find(mk_account_key(owner))
+    flags = FindOptions.REMOVE_PREFIX | FindOptions.KEYS_ONLY
+    context = get_context()
+    return find(mk_account_key(owner), context, flags)
 
 @public
 def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
