@@ -435,7 +435,7 @@ def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes, 
 
     return internal_mint(account, meta, lockedContent, royalties, data)
 
-@public
+@public(safe=True)
 def getRoyalties(tokenId: bytes) -> bytes:
     """
     Get a token royalties values.
