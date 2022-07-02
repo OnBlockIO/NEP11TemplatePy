@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 import os
-
-from boa3.boa3 import Boa3
-
-from contextlib import contextmanager
 import sys, os
+from boa3.boa3 import Boa3
+from contextlib import contextmanager
 
 @contextmanager
 def suppress_stdout():

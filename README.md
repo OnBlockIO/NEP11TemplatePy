@@ -13,8 +13,6 @@ The contract features a generic mint() method, a burn() method, has builtin supp
 
 `TOKEN_SYMBOL` : replace with your desired SYMBOL
 
-`onNEP17Payment` : either leave as is, or uncomment the section with `abort()` to prevent any NEP17 to be sent to the contract (as a failsafe, but would prevent any minting fee logic), or add your own custom logic
-
 `mint` : either leave as is, to allow anyone to mint on the contract, or uncomment `verify()` to restrict minting to one of the authorized addresses
 
 
