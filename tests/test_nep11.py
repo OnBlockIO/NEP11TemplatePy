@@ -1,17 +1,12 @@
-from typing import Dict
 from pathlib import Path
 from boa3_test.tests.boa_test import BoaTest
 from boa3_test.tests.test_classes.testengine import TestEngine
 from boa3.neo.smart_contract.VoidType import VoidType
 from boa3.neo.cryptography import hash160
 from boa3.constants import GAS_SCRIPT
-from boa3.neo.vm.type.String import String
-from boa3.boa3 import Boa3
-from boa3.neo import to_script_hash, to_hex_str, from_hex_str
-from boa3.builtin.type import UInt160
-from boa3.builtin.interop.iterator import Iterator
+from boa3.neo import to_script_hash, to_hex_str
+from boa3.builtin.type import UInt160, ByteString
 from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
-from boa3.neo.core.types.InteropInterface import InteropInterface
 
 
 class NEP11Test(BoaTest):
@@ -24,7 +19,7 @@ class NEP11Test(BoaTest):
     CONTRACT_PATH_PY = NEP11_ROOT + '/contracts/NEP11/NEP11-Template.py'
 
     # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/home/merl/source/onblock/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net5.0/'
+    TEST_ENGINE_PATH = '/Users/vincent/Dev/OnBlock/n3-tokens-contracts/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
     # OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NaCEUqriRmYeH9AKH11FvKGDJ1jWgBwAzi'))
@@ -242,9 +237,9 @@ class NEP11Test(BoaTest):
         # should fail because contract is paused
         with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
             token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                    aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
+                    aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
                     signer_accounts=[aux_address],
-                    expected_result_type=bytes)
+                    expected_result_type=int)
 
         # unpause contract
         fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'updatePause', False,
@@ -253,9 +248,9 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
+            aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
             signer_accounts=[aux_address],
-            expected_result_type=bytes)
+            expected_result_type=int)
         self.print_notif(engine.notifications)
 
     def test_nep11_mint(self):
@@ -275,20 +270,20 @@ class NEP11Test(BoaTest):
 
         # should succeed now that account has enough fees
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
                 signer_accounts=[aux_address],
-                expected_result_type=bytes)
+                expected_result_type=int)
 
         print("get props now: ")
-        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=bytes)
+        properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=ByteString)
         print("props: " + str(properties))
-        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=bytes)
+        royalties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'getRoyalties', token, expected_result_type=ByteString)
         print("royalties: " + str(royalties))
 
         print('non existing props:')
         with self.assertRaises(TestExecutionException, msg='An unhandled exception was thrown. Unable to parse metadata'):
             properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties',
-                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=bytes)
+                    bytes('thisisanonexistingtoken', 'utf-8'), expected_result_type=ByteString)
         print("props: " + str(properties))
 
         # check balances after
@@ -317,9 +312,9 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
                 signer_accounts=[aux_address],
-                expected_result_type=bytes)
+                expected_result_type=ByteString)
         properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token)
 
         # check balances after
@@ -373,9 +368,9 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
+                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
                 signer_accounts=[aux_address],
-                expected_result_type=bytes)
+                expected_result_type=ByteString)
 
         # burn
         burn = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'burn', token,
@@ -406,9 +401,9 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES, None,
+            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
             signer_accounts=[self.OTHER_ACCOUNT_1],
-            expected_result_type=bytes)
+            expected_result_type=ByteString)
 
         # the smart contract will abort if any address calls the NEP11 onPayment method
         with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
