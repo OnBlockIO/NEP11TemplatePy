@@ -1,12 +1,8 @@
 #!/usr/bin/env python3
 
 import os
-import logging
-from pathlib import Path
 
 from boa3.boa3 import Boa3
-from boa3.builtin.type import UInt160
-from boa3.neo.cryptography import hash160
 
 from contextlib import contextmanager
 import sys, os
@@ -60,8 +56,8 @@ def build_contract(path):
 
 GHOST_ROOT = str(os.getcwd())
 to_remove = ['debug(']
-debug_block_start = ['#DEBUG_START']
-debug_block_end = ['#DEBUG_END']
+debug_block_start = ['# DEBUG_START']
+debug_block_end = ['# DEBUG_END']
 
 CONTRACT_DIR = GHOST_ROOT + '/contracts/NEP11/'
 CONTRACT_PATH_PY = GHOST_ROOT + '/contracts/NEP11/NEP11-Template.py'
