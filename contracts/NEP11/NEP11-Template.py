@@ -409,7 +409,7 @@ def getRoyalties(tokenId: ByteString) -> ByteString:
 
     :param tokenId: the token to get royalties values
     :type tokenId: ByteString
-    :return: bytes of addresses and values for this token royalties.
+    :return: ByteString of addresses and values for this token royalties.
     :raise AssertionError: raised if any `tokenId` is not a valid NFT.
     """
     royalties = get_royalties(tokenId)
