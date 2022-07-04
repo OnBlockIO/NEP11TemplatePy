@@ -172,7 +172,7 @@ def balanceOf(owner: UInt160) -> int:
     :return: the total amount of tokens owned by the specified address.
     :raise AssertionError: raised if `owner` length is not 20.
     """
-    assert validateAddress(owner), "Not a valid address"
+    expect(validateAddress(owner), "Not a valid address")
     debug(['balanceOf: ', get(mk_balance_key(owner), get_read_only_context()).to_int()])
     return get(mk_balance_key(owner), get_read_only_context()).to_int()
 
@@ -188,7 +188,7 @@ def tokensOf(owner: UInt160) -> Iterator:
     :return: an iterator that contains all of the token ids owned by the specified address.
     :raise AssertionError: raised if `owner` length is not 20.
     """
-    assert validateAddress(owner), "Not a valid address"
+    expect(validateAddress(owner), "Not a valid address")
     flags = FindOptions.REMOVE_PREFIX | FindOptions.KEYS_ONLY
     context = get_read_only_context()
     return find(mk_account_key(owner), context, flags)
@@ -218,8 +218,8 @@ def transfer(to: UInt160, tokenId: ByteString, data: Any) -> bool:
     :return: whether the transfer was successful
     :raise AssertionError: raised if `to` length is not 20 or if `tokenId` is not a valid NFT or if the contract is paused.
     """
-    assert validateAddress(to), "Not a valid address"
-    assert not isPaused(), "Contract is currently paused"
+    expect(validateAddress(to), "Not a valid address")
+    expect(not isPaused(), "Contract is currently paused")
     token_owner = get_owner_of(tokenId)
 
     if not check_witness(token_owner):
@@ -296,7 +296,7 @@ def properties(tokenId: ByteString) -> Dict[Any, Any]:
     :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
     """
     metaBytes = cast(str, get_meta(tokenId))
-    assert len(metaBytes) != 0, 'No metadata available for token'
+    expect(len(metaBytes) != 0, 'No metadata available for token')
     metaObject = cast(Dict[str, str], json_deserialize(metaBytes))
 
     return metaObject
@@ -314,7 +314,7 @@ def propertiesJson(tokenId: ByteString) -> ByteString:
     :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
     """
     meta = get_meta(tokenId)
-    assert len(meta) != 0, 'No metadata available for token'
+    expect(len(meta) != 0, 'No metadata available for token')
     debug(['properties: ', meta])
     return meta
 
@@ -374,7 +374,7 @@ def burn(tokenId: ByteString) -> bool:
     :return: whether the burn was successful.
     :raise AssertionError: raised if the contract is paused.
     """
-    assert not isPaused(), "Contract is currently paused"
+    expect(not isPaused(), "Contract is currently paused")
     return internal_burn(tokenId)
 
 @public
@@ -393,12 +393,13 @@ def mint(account: UInt160, meta: ByteString, lockedContent: ByteString, royaltie
     :return: tokenId of the token minted
     :raise AssertionError: raised if the contract is paused or if check witness fails.
     """
-    assert validateAddress(account), "Not a valid address"  # not really necessary because check_witness would catch an invalid address
-    assert not isPaused(), "Contract is currently paused"
+    expect(validateAddress(account), "Not a valid address")  # not really necessary because check_witness would catch an invalid address
+    expect(not isPaused(), "Contract is currently paused")
 
     # TODO_TEMPLATE: add own logic if necessary, or uncomment below to restrict minting to contract authorized addresses
-    # assert verify(), '`acccount` is not allowed to mint'
-    assert check_witness(account), "Invalid witness" 
+    # verified: bool = verify()
+    # expect(verified, '`account` is not allowed for mint')
+    expect(check_witness(account), "Invalid witness")
 
     return internal_mint(account, meta, lockedContent, royalties)
 
@@ -441,7 +442,7 @@ def getLockedContent(tokenId: ByteString) -> ByteString:
     """
     owner = get_owner_of(tokenId)
 
-    assert check_witness(owner), "Prohibited access to locked content!"
+    expect(check_witness(owner), "Prohibited access to locked content!")
     set_locked_view_counter(tokenId)
     
     debug(['getLockedContent: ', get_locked_content(tokenId)])
@@ -487,9 +488,10 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     :return: whether the transaction signature is correct
     :raise AssertionError: raised if witness is not verified.
     """
-    assert verify(), '`acccount` is not allowed for setAuthorizedAddress'
-    assert validateAddress(address), "Not a valid address"
-    assert isinstance(authorized, bool), "authorized has to be of type bool"
+    verified: bool = verify()
+    expect(verified, '`account` is not allowed for setAuthorizedAddress')
+    expect(validateAddress(address), "Not a valid address")
+    expect(isinstance(authorized, bool), "authorized has to be of type bool")
     serialized = get(AUTH_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
 
@@ -520,8 +522,9 @@ def updatePause(status: bool) -> bool:
     :return: the contract pause status
     :raise AssertionError: raised if witness is not verified.
     """
-    assert verify(), '`acccount` is not allowed for updatePause'
-    assert isinstance(status, bool), "status has to be of type bool"
+    verified: bool = verify()
+    expect(verified, '`account` is not allowed for updatePause')
+    expect(isinstance(status, bool), "status has to be of type bool")
     put(PAUSED, status)
     debug(['updatePause: ', get(PAUSED, get_read_only_context()).to_bool()])
     return get(PAUSED, get_read_only_context()).to_bool() 
@@ -573,7 +576,8 @@ def update(script: bytes, manifest: bytes):
     :type manifest: ByteString
     :raise AssertionError: raised if witness is not verified
     """
-    assert verify(), '`acccount` is not allowed for update'
+    verified: bool = verify()
+    expect(verified, '`account` is not allowed for update')
     update_contract(script, manifest) 
     debug(['update called and done'])
 
@@ -584,7 +588,8 @@ def destroy():
 
     :raise AssertionError: raised if witness is not verified
     """
-    assert verify(), '`acccount` is not allowed for destroy'
+    verified: bool = verify()
+    expect(verified, '`account` is not allowed for destroy')
     destroy_contract() 
     debug(['destroy called and done'])
 
@@ -628,7 +633,7 @@ def internal_mint(account: UInt160, meta: ByteString, lockedContent: ByteString,
     :return: tokenId of the token minted
     :raise AssertionError: raised if meta is empty, or if contract is paused.
     """
-    assert len(meta) != 0, '`meta` can not be empty'
+    expect(len(meta) != 0, '`meta` can not be empty')
 
     tokenId = get(TOKEN_COUNT, get_read_only_context()).to_int() + 1
     put(TOKEN_COUNT, tokenId)
@@ -760,6 +765,12 @@ def set_locked_view_counter(tokenId: ByteString):
     put(key, count)
 
 ## helpers
+
+def expect(condition: bool, message: str):
+    # TODO: Add assert message back after PR #737 is fixed
+    # https://github.com/neo-project/neo-modules/pull/737
+    # assert condition, message
+    assert condition
 
 def validateAddress(address: UInt160) -> bool:
     if not isinstance(address, UInt160):
