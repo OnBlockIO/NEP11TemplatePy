@@ -767,10 +767,7 @@ def set_locked_view_counter(tokenId: ByteString):
 ## helpers
 
 def expect(condition: bool, message: str):
-    # TODO: Add assert message back after PR #737 is fixed
-    # https://github.com/neo-project/neo-modules/pull/737
-    # assert condition, message
-    assert condition
+    assert condition, message
 
 def validateAddress(address: UInt160) -> bool:
     if not isinstance(address, UInt160):
