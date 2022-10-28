@@ -651,12 +651,23 @@ def internal_mint(account: UInt160, meta: ByteString, lockedContent: ByteString,
         debug(['locked: ', lockedContent])
 
     if len(royalties) != 0:
+        expect(validateRoyalties(royalties), "Not a valid royalties format")
         add_royalties(tokenIdBytes, cast(str, royalties))
         debug(['royalties: ', royalties])
 
     add_token_account(account, tokenIdBytes)
     post_transfer(None, account, tokenIdBytes, None)
     return tokenIdBytes
+
+def validateRoyalties(bytes: ByteString) -> bool:
+
+    strRoyalties: str = cast(str, bytes)
+    deserialized = cast(List[Dict[str, str]], json_deserialize(strRoyalties))
+
+    for royalty in deserialized:
+        if "address" not in royalty or "value" not in royalty:
+            return False
+    return True
 
 def remove_token_account(holder: UInt160, tokenId: ByteString):
     key = mk_account_key(holder) + tokenId

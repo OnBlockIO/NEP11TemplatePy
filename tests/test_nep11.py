@@ -29,6 +29,7 @@ class NEP11Test(BoaTest):
     TOKEN_META = bytes('{ "name": "NEP11", "description": "Some description", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
     TOKEN_LOCKED = bytes('lockedContent', 'utf-8')
     ROYALTIES = bytes('[{"address": "NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN", "value": 2000}, {"address": "NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB", "value": 3000}]', 'utf-8')
+    ROYALTIES_BOGUS = bytes('[{"addresss": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
 
     def build_contract(self, preprocess=False):
         print('contract path: ' + self.CONTRACT_PATH_PY)
@@ -269,9 +270,16 @@ class NEP11Test(BoaTest):
         add_amount = 10 * 10 ** 8
         engine.add_gas(aux_address, add_amount)
 
+        # should fail because royalties are bogus
+        with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
+            token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
+                    aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
+                    signer_accounts=[aux_address],
+                    expected_result_type=int)
+
         # should succeed now that account has enough fees
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
+                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES_BOGUS,
                 signer_accounts=[aux_address],
                 expected_result_type=int)
 
