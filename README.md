@@ -1,5 +1,5 @@
 # NEP11TemplatePy
-Fully featured NEP11 python contract to allow to easily deploy your own NFT minting contract, and make it seamless to integrate it on GhostMarket.
+Fully featured NEP-11 python contract to allow to easily deploy your own NFT minting contract, and make it seamless to integrate it on GhostMarket.
 
 
 ## Contract overview
@@ -37,7 +37,7 @@ This contract features two methods to handle properties:
 
 `properties` and `propertiesJson`
 
-`properties` returns a MAP of all the NFT metadata, and is what follows NEP11 standard (even though currently the standard is inconsistent as the signature shows it should be a MAP, while the explanation tied to it shows it should be a serialized NVM object).
+`properties` returns a MAP of all the NFT metadata, and is what follows NEP-11 standard (even though currently the standard is inconsistent as the signature shows it should be a MAP, while the explanation tied to it shows it should be a serialized NVM object).
 
 `propertiesJson` returns a serialized JSON string of all the NFT metadata, and is what makes more sense for us to handle metadata.
 
