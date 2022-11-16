@@ -190,8 +190,7 @@ def tokensOf(owner: UInt160) -> Iterator:
     """
     expect(validateAddress(owner), "tokensOf - not a valid address")
     flags = FindOptions.REMOVE_PREFIX | FindOptions.KEYS_ONLY
-    context = get_read_only_context()
-    return find(mk_account_key(owner), context, flags)
+    return find(mk_account_key(owner), get_read_only_context(), flags)
 
 @public
 def transfer(to: UInt160, tokenId: ByteString, data: Any) -> bool:
@@ -494,6 +493,7 @@ def setAuthorizedAddress(address: UInt160, authorized: bool):
     expect(isinstance(authorized, bool), "setAuthorizedAddress - authorized has to be of type bool")
     serialized = get(AUTH_ADDRESSES, get_read_only_context())
     auth = cast(list[UInt160], deserialize(serialized))
+    expect(len(auth) <= 10, "setAuthorizedAddress - authorized addresses count has to be <= 10")
 
     if authorized:
         found = False
