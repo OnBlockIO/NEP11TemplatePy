@@ -24,7 +24,7 @@ class NEP11Test(BoaTest):
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
     TOKEN_META = bytes('{ "name": "NEP11", "description": "Some description", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
-    TOKEN_LOCKED = bytes('lockedContent', 'utf-8')
+    LOCK_CONTENT = bytes('lockedContent', 'utf-8')
     ROYALTIES = bytes('[{"address": "NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN", "value": 2000}, {"address": "NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB", "value": 3000}]', 'utf-8')
     ROYALTIES_BOGUS = bytes('[{"addresss": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
     CONTRACT = UInt160()
@@ -237,20 +237,20 @@ class NEP11Test(BoaTest):
         # should fail because contract is paused
         with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
             token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                    aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
+                    aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                     signer_accounts=[aux_address],
-                    expected_result_type=int)
+                    expected_result_type=bytes)
 
         # unpause contract
         fee = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'updatePause', False,
                 signer_accounts=[self.OWNER_SCRIPT_HASH],
-                expected_result_type=int)
+                expected_result_type=bytes)
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
+            aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
             signer_accounts=[aux_address],
-            expected_result_type=int)
+            expected_result_type=bytes)
         self.print_notif(engine.notifications)
 
     def test_nep11_mint(self):
@@ -271,15 +271,15 @@ class NEP11Test(BoaTest):
         # should fail because royalties are bogus
         with self.assertRaises(TestExecutionException, msg=self.ASSERT_RESULTED_FALSE_MSG):
             token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                    aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
+                    aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES_BOGUS,
                     signer_accounts=[aux_address],
-                    expected_result_type=int)
+                    expected_result_type=bytes)
 
         # should succeed now that account has enough fees
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES_BOGUS,
+                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[aux_address],
-                expected_result_type=int)
+                expected_result_type=bytes)
 
         print("get props now: ")
         properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token, expected_result_type=ByteString)
@@ -319,9 +319,9 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
+                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[aux_address],
-                expected_result_type=ByteString)
+                expected_result_type=bytes)
         properties = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'properties', token)
 
         # check balances after
@@ -375,9 +375,9 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-                aux_address, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
+                aux_address, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
                 signer_accounts=[aux_address],
-                expected_result_type=ByteString)
+                expected_result_type=bytes)
 
         # burn
         burn = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'burn', token,
@@ -408,9 +408,9 @@ class NEP11Test(BoaTest):
 
         # mint
         token = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, 'mint', 
-            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.TOKEN_LOCKED, self.ROYALTIES,
+            self.OTHER_ACCOUNT_1, self.TOKEN_META, self.LOCK_CONTENT, self.ROYALTIES,
             signer_accounts=[self.OTHER_ACCOUNT_1],
-            expected_result_type=ByteString)
+            expected_result_type=bytes)
 
         # the smart contract will abort if any address calls the NEP11 onPayment method
         with self.assertRaises(TestExecutionException, msg=self.ABORTED_CONTRACT_MSG):
