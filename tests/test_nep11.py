@@ -1,5 +1,4 @@
 from pathlib import Path
-
 from boa3_test.tests.boa_test import BoaTest
 from boa3_test.tests.test_classes.testengine import TestEngine
 from boa3.neo.smart_contract.VoidType import VoidType
@@ -8,6 +7,7 @@ from boa3.constants import GAS_SCRIPT
 from boa3.neo import to_script_hash, to_hex_str
 from boa3.builtin.type import UInt160, ByteString
 from boa3_test.tests.test_classes.TestExecutionException import TestExecutionException
+from boa3_test.tests.test_classes.testcontract import TestContract
 
 
 class NEP11Test(BoaTest):
@@ -27,6 +27,7 @@ class NEP11Test(BoaTest):
     TOKEN_LOCKED = bytes('lockedContent', 'utf-8')
     ROYALTIES = bytes('[{"address": "NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN", "value": 2000}, {"address": "NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB", "value": 3000}]', 'utf-8')
     ROYALTIES_BOGUS = bytes('[{"addresss": "someaddress", "value": "20"}, {"address": "someaddress2", "value": "30"}]', 'utf-8')
+    CONTRACT = UInt160()
 
     def build_contract(self, preprocess=False):
         print('contract path: ' + self.CONTRACT_PATH_PY)
@@ -42,18 +43,18 @@ class NEP11Test(BoaTest):
             self.CONTRACT = hash160(output)
 
     def deploy_contract(self, engine):
+        cc = TestContract(self.CONTRACT_PATH_NEF, self.CONTRACT_PATH_JSON)
         # engine.add_contract(self.CONTRACT_PATH_NEF.replace('.py', '.nef'))
         engine.add_signer_account(self.OWNER_SCRIPT_HASH)
         result = self.run_smart_contract(engine, self.CONTRACT_PATH_NEF, '_deploy', self.OWNER_SCRIPT_HASH, False,
                                          signer_accounts=[self.OWNER_SCRIPT_HASH],
                                          expected_result_type=bool)
         storage = engine.storage.to_json()
-        for i in range(0, len(storage)):
-            print(storage[i])
+        #for i in range(0, len(storage)):
+        #    print(storage[i])
         #self.assertEqual(VoidType, result)
 
     def prepare_testengine(self, preprocess=False) -> TestEngine:
-        self.build_contract(preprocess)
         engine = TestEngine(self.TEST_ENGINE_PATH)
         engine.reset_engine()
         
