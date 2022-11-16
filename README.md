@@ -67,7 +67,7 @@ update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
 tests can be run with:
 
 ```
-test_nep11.py
+python -m unittest test_nep11
 ```
 
 individual test can be run witn  
