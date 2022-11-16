@@ -18,12 +18,9 @@ class NEP11Test(BoaTest):
     CONTRACT_PATH_JSON = NEP11_ROOT+ '/contracts/NEP11/NEP11-Template.manifest.json'
     CONTRACT_PATH_NEF = NEP11_ROOT + '/contracts/NEP11/NEP11-Template.nef'
     CONTRACT_PATH_PY = NEP11_ROOT + '/contracts/NEP11/NEP11-Template.py'
-
-    # TODO add .env file and move test engine path there
-    TEST_ENGINE_PATH = '/Users/vincent/Dev/OnBlock/n3-tokens-contracts/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0/'
+    TEST_ENGINE_PATH = '%s/neo-devpack-dotnet/src/Neo.TestEngine/bin/Debug/net6.0' % NEP11_ROOT
     BOA_PATH = PRJ_ROOT + '/neo3-boa/boa3'
     OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NZcuGiwRu1QscpmCyxj5XwQBUf6sk7dJJN'))
-    # OWNER_SCRIPT_HASH = UInt160(to_script_hash(b'NaCEUqriRmYeH9AKH11FvKGDJ1jWgBwAzi'))
     OTHER_ACCOUNT_1 = UInt160(to_script_hash(b'NiNmXL8FjEUEs1nfX9uHFBNaenxDHJtmuB'))
     OTHER_ACCOUNT_2 = bytes(range(20))
     TOKEN_META = bytes('{ "name": "NEP11", "description": "Some description", "image": "{some image URI}", "tokenURI": "{some URI}" }', 'utf-8')
