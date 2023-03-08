@@ -4,7 +4,7 @@ from boa3.builtin import CreateNewEvent, NeoMetadata, metadata, public
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import call_contract, destroy_contract, update_contract
 from boa3.builtin.interop.runtime import check_witness, script_container
-from boa3.builtin.interop.stdlib import serialize, deserialize
+from boa3.builtin.interop.stdlib import serialize, deserialize, atoi
 from boa3.builtin.interop.storage import delete, get, put, find, get_read_only_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
 from boa3.builtin.interop.iterator import Iterator
@@ -405,7 +405,7 @@ def mint(account: UInt160, meta: ByteString, lockedContent: ByteString, royaltie
 @public(safe=True)
 def getRoyalties(tokenId: ByteString) -> ByteString:
     """
-    Get a token royalties values.
+    Get a token royalties values - ghostmarket standard.
 
     :param tokenId: the token to get royalties values
     :type tokenId: ByteString
@@ -414,6 +414,23 @@ def getRoyalties(tokenId: ByteString) -> ByteString:
     """
     royalties = get_royalties(tokenId)
     debug(['getRoyalties: ', royalties])
+    return royalties
+
+@public(safe=True)
+def royaltyInfo(tokenId: ByteString, royaltyToken: UInt160, salePrice: int) -> List[List[Any]]:
+    """
+    Get a token royalties values - official standard.
+
+    :param tokenId: the token used to calculate royalties values
+    :type tokenId: ByteString
+    :param royaltyToken: the currency used to calculate royalties values
+    :type royaltyToken: ByteString
+    :param salePrice: the sale amount used to calculate royalties values
+    :type salePrice: ByteString
+    :return: Returns a NeoVM Array stack item with single or multi array, each array still has two elements
+    :raise AssertionError: raised if any `tokenId` is not a valid NFT or if royaltyToken is not a valid UInt160 or salePrice incorrect
+    """
+    royalties = get_royalties_info(tokenId, salePrice)
     return royalties
 
 @public(safe=True)
@@ -748,6 +765,31 @@ def get_royalties(tokenId: ByteString) -> ByteString:
     debug(['get_royalties: ', key, tokenId])
     val = get(key, get_read_only_context())
     return val
+
+def get_royalties_info(tokenId: ByteString, salePrice: int) -> List[List[Any]]:
+    key = mk_royalties_key(tokenId)
+    val = get(key, get_read_only_context())
+
+    strRoyalties: str = cast(str, val)
+    deserialized = cast(List[Dict[str, str]], json_deserialize(strRoyalties))
+
+    result: List[List[Any]] = []
+    for royalty in deserialized:
+        royalties: List[Any] = []
+
+        val: int = 0
+        if isinstance(royalty["value"], str):
+            val = atoi(royalty["value"], 10)
+        else:
+            val = royalty["value"]
+        amount: int = salePrice * val // 10000
+        
+        recipient: UInt160 = cast(UInt160,(royalty["address"]).to_script_hash())
+        royalties.append(recipient)
+        royalties.append(amount)
+        result.append(royalties)
+
+    return result
 
 def add_royalties(tokenId: ByteString, royalties: str):
     key = mk_royalties_key(tokenId)
