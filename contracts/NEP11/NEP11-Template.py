@@ -770,10 +770,14 @@ def get_royalties_info(tokenId: ByteString, salePrice: int) -> List[List[Any]]:
     key = mk_royalties_key(tokenId)
     val = get(key, get_read_only_context())
 
+    result: List[List[Any]] = []
+
+    if len(val) == 0:
+        return result
+
     strRoyalties: str = cast(str, val)
     deserialized = cast(List[Dict[str, str]], json_deserialize(strRoyalties))
 
-    result: List[List[Any]] = []
     for royalty in deserialized:
         royalties: List[Any] = []
 
