@@ -1,23 +1,25 @@
 from typing import Any, Dict, List, Union, cast
 
-from boa3.builtin import CreateNewEvent, NeoMetadata, metadata, public
+from boa3.builtin.compile_time import CreateNewEvent, NeoMetadata, metadata, public
+from boa3.builtin.type.helper import to_int, to_bool, to_bytes
 from boa3.builtin.interop.blockchain import get_contract, Transaction
-from boa3.builtin.interop.contract import call_contract, destroy_contract, update_contract
+from boa3.builtin.interop.contract import CallFlags, call_contract, destroy_contract, get_call_flags, update_contract
 from boa3.builtin.interop.runtime import check_witness, script_container
 from boa3.builtin.interop.stdlib import serialize, deserialize, atoi
 from boa3.builtin.interop.storage import delete, get, put, find, get_read_only_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
 from boa3.builtin.interop.iterator import Iterator
-from boa3.builtin.type import UInt160, ByteString
+from boa3.builtin.type import UInt160
 from boa3.builtin.interop.json import json_deserialize
 from boa3.builtin.interop.runtime import get_network
+from boa3.builtin.contract import to_script_hash
 
 
 # -------------------------------------------
 # METADATA
 # -------------------------------------------
 @metadata
-def gm_manifest() -> NeoMetadata:
+def manifest_metadata() -> NeoMetadata:
     """
     Defines this smart contract's metadata information
     """
@@ -25,8 +27,8 @@ def gm_manifest() -> NeoMetadata:
     meta.author = "Template Author"  # TODO_TEMPLATE
     meta.description = "Some Description"  # TODO_TEMPLATE
     meta.email = "hello@example.com"  # TODO_TEMPLATE
-    meta.supported_standards = ["NEP-11"]
-    meta.source = ["https://github.com/"]  # TODO_TEMPLATE
+    meta.supported_standards = ["NEP-11", "NEP-24"]
+    meta.source = "https://github.com/"  # TODO_TEMPLATE
     # meta.add_permission(contract='*', methods=['*'])
     return meta
 
@@ -48,7 +50,7 @@ PAUSED = b'paused'
 
 
 # -------------------------------------------
-# Prefixes
+# PREFIXES
 # -------------------------------------------
 
 ACCOUNT_PREFIX = b'ACC'
@@ -63,7 +65,7 @@ ROYALTIES_PREFIX = b'RYP'
 
 
 # -------------------------------------------
-# Keys
+# KEYS
 # -------------------------------------------
 
 TOKEN_COUNT = b'TOKEN_COUNT'
@@ -71,7 +73,7 @@ AUTH_ADDRESSES = b'AUTH_ADDRESSES'
 
 
 # -------------------------------------------
-# Events
+# EVENTS
 # -------------------------------------------
 
 on_transfer = CreateNewEvent(
@@ -80,7 +82,7 @@ on_transfer = CreateNewEvent(
         ('from_addr', Union[UInt160, None]),
         ('to_addr', Union[UInt160, None]),
         ('amount', int),
-        ('tokenId', ByteString)
+        ('tokenId', bytes)
     ],
     'Transfer'
 )
@@ -97,7 +99,7 @@ on_auth = CreateNewEvent(
 
 on_unlock = CreateNewEvent(
     [
-        ('tokenId', ByteString),
+        ('tokenId', bytes),
         ('counter', int)
     ],
     'UnlockIncremented'
@@ -108,16 +110,22 @@ on_unlock = CreateNewEvent(
 # DEBUG
 # -------------------------------------------
 
-debug = CreateNewEvent(
+on_debug = CreateNewEvent(
     [
         ('params', list),
     ],
     'Debug'
 )
+
+def debug(params: list):
+    allow_notify = get_call_flags() & CallFlags.ALLOW_NOTIFY
+    if allow_notify == CallFlags.ALLOW_NOTIFY:
+        on_debug(params)
+
 # DEBUG_END
 
 # -------------------------------------------
-# NEP-11 Methods
+# NEP-11 METHODS
 # -------------------------------------------
 
 @public(safe=True)
@@ -157,8 +165,8 @@ def totalSupply() -> int:
 
     :return: the total token supply deployed in the system.
     """
-    debug(['totalSupply: ', get(SUPPLY_PREFIX).to_int()])
-    return get(SUPPLY_PREFIX, get_read_only_context()).to_int()
+    debug(['totalSupply: ', to_int(get(SUPPLY_PREFIX))])
+    return to_int(get(SUPPLY_PREFIX, get_read_only_context()))
 
 @public(safe=True)
 def balanceOf(owner: UInt160) -> int:
@@ -173,8 +181,8 @@ def balanceOf(owner: UInt160) -> int:
     :raise AssertionError: raised if `owner` length is not 20.
     """
     expect(validateAddress(owner), "balanceOf - not a valid address")
-    debug(['balanceOf: ', get(mk_balance_key(owner), get_read_only_context()).to_int()])
-    return get(mk_balance_key(owner), get_read_only_context()).to_int()
+    debug(['balanceOf: ', to_int(get(mk_balance_key(owner), get_read_only_context()))])
+    return to_int(get(mk_balance_key(owner), get_read_only_context()))
 
 @public(safe=True)
 def tokensOf(owner: UInt160) -> Iterator:
@@ -193,7 +201,7 @@ def tokensOf(owner: UInt160) -> Iterator:
     return find(mk_account_key(owner), get_read_only_context(), flags)
 
 @public
-def transfer(to: UInt160, tokenId: ByteString, data: Any) -> bool:
+def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
     """
     Transfers the token with id tokenId to address to
 
@@ -211,7 +219,7 @@ def transfer(to: UInt160, tokenId: ByteString, data: Any) -> bool:
     :param to: the address to transfer to
     :type to: UInt160
     :param tokenId: the token to transfer
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :param data: whatever data is pertinent to the onPayment method
     :type data: Any
     :return: whether the transfer was successful
@@ -235,7 +243,7 @@ def transfer(to: UInt160, tokenId: ByteString, data: Any) -> bool:
     post_transfer(token_owner, to, tokenId, data)
     return True
 
-def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], tokenId: ByteString, data: Any):
+def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], tokenId: bytes, data: Any):
     """
     Checks if the one receiving NEP-11 tokens is a smart contract and if it's one the onPayment method will be called - internal
 
@@ -243,27 +251,27 @@ def post_transfer(token_owner: Union[UInt160, None], to: Union[UInt160, None], t
     :type token_owner: UInt160
     :param to: the address of the receiver
     :type to: UInt160
-    :param tokenId: the token hash as ByteString 
-    :type tokenId: ByteString 
+    :param tokenId: the token hash as bytes 
+    :type tokenId: bytes 
     :param data: any pertinent data that might validate the transaction
     :type data: Any
     """
     on_transfer(token_owner, to, 1, tokenId)
-    if not isinstance(to, None):
+    if to is not None:
         contract = get_contract(to)
-        if not isinstance(contract, None):
+        if contract is not None:
             call_contract(to, 'onNEP11Payment', [token_owner, 1, tokenId, data])
             pass
 
 @public(safe=True)
-def ownerOf(tokenId: ByteString) -> UInt160:
+def ownerOf(tokenId: bytes) -> UInt160:
     """
     Get the owner of the specified token.
 
     The parameter tokenId SHOULD be a valid NFT. If not, this method SHOULD throw an exception.
 
     :param tokenId: the token for which to check the ownership
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :return: the owner of the specified token.
     :raise AssertionError: raised if `tokenId` is not a valid NFT.
     """
@@ -283,32 +291,32 @@ def tokens() -> Iterator:
     return find(TOKEN_PREFIX, context, flags)
 
 @public(safe=True)
-def properties(tokenId: ByteString) -> Dict[Any, Any]:
+def properties(tokenId: bytes) -> Dict[Any, Any]:
     """
     Get the properties of a token.
 
     The parameter tokenId SHOULD be a valid NFT. If no metadata is found (invalid tokenId), an exception is thrown.
 
     :param tokenId: the token for which to check the properties
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :return: a serialized NVM object containing the properties for the given NFT.
     :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
     """
     metaBytes = cast(str, get_meta(tokenId))
     expect(len(metaBytes) != 0, 'properties - no metadata available for token')
     metaObject = cast(Dict[str, str], json_deserialize(metaBytes))
-
+    debug(['properties: ', metaObject])
     return metaObject
 
 @public(safe=True)
-def propertiesJson(tokenId: ByteString) -> ByteString:
+def propertiesJson(tokenId: bytes) -> bytes:
     """
     Get the properties of a token.
 
     The parameter tokenId SHOULD be a valid NFT. If no metadata is found (invalid tokenId), an exception is thrown.
 
     :param tokenId: the token for which to check the properties
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :return: a serialized NVM object containing the properties for the given NFT.
     :raise AssertionError: raised if `tokenId` is not a valid NFT, or if no metadata available.
     """
@@ -326,7 +334,7 @@ def _deploy(data: Any, upgrade: bool):
     if upgrade:
         return
 
-    if get(DEPLOYED, get_read_only_context()).to_bool():
+    if to_bool(get(DEPLOYED, get_read_only_context())):
         return
 
     tx = cast(Transaction, script_container)
@@ -360,16 +368,16 @@ def internal_deploy(owner: UInt160):
     put(AUTH_ADDRESSES, serialized)
 
 # -------------------------------------------
-# Methods
+# METHODS
 # -------------------------------------------
 
 @public
-def burn(tokenId: ByteString) -> bool:
+def burn(tokenId: bytes) -> bool:
     """
     Burn a token.
 
     :param tokenId: the token to burn
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :return: whether the burn was successful.
     :raise AssertionError: raised if the contract is paused.
     """
@@ -377,18 +385,18 @@ def burn(tokenId: ByteString) -> bool:
     return internal_burn(tokenId)
 
 @public
-def mint(account: UInt160, meta: ByteString, lockedContent: ByteString, royalties: ByteString) -> ByteString:
+def mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes) -> bytes:
     """
     Mint new token.
 
     :param account: the address of the account that is minting token
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta: ByteString
+    :type meta: bytes
     :param lockedContent: the lock content to use for this token
-    :type lockedContent: ByteString
+    :type lockedContent: bytes
     :param royalties: the royalties to use for this token
-    :type royalties: ByteString
+    :type royalties: bytes
     :return: tokenId of the token minted
     :raise AssertionError: raised if the contract is paused or if check witness fails.
     """
@@ -403,13 +411,13 @@ def mint(account: UInt160, meta: ByteString, lockedContent: ByteString, royaltie
     return internal_mint(account, meta, lockedContent, royalties)
 
 @public(safe=True)
-def getRoyalties(tokenId: ByteString) -> ByteString:
+def getRoyalties(tokenId: bytes) -> bytes:
     """
     Get a token royalties values - ghostmarket standard.
 
     :param tokenId: the token to get royalties values
-    :type tokenId: ByteString
-    :return: ByteString of addresses and values for this token royalties.
+    :type tokenId: bytes
+    :return: bytes of addresses and values for this token royalties.
     :raise AssertionError: raised if any `tokenId` is not a valid NFT.
     """
     royalties = get_royalties(tokenId)
@@ -417,16 +425,16 @@ def getRoyalties(tokenId: ByteString) -> ByteString:
     return royalties
 
 @public(safe=True)
-def royaltyInfo(tokenId: ByteString, royaltyToken: UInt160, salePrice: int) -> List[List[Any]]:
+def royaltyInfo(tokenId: bytes, royaltyToken: UInt160, salePrice: int) -> List[List[Any]]:
     """
     Get a token royalties values - official standard.
 
     :param tokenId: the token used to calculate royalties values
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :param royaltyToken: the currency used to calculate royalties values
-    :type royaltyToken: ByteString
+    :type royaltyToken: UInt160
     :param salePrice: the sale amount used to calculate royalties values
-    :type salePrice: ByteString
+    :type salePrice: int
     :return: Returns a NeoVM Array stack item with single or multi array, each array still has two elements
     :raise AssertionError: raised if any `tokenId` is not a valid NFT or if royaltyToken is not a valid UInt160 or salePrice incorrect
     """
@@ -434,24 +442,24 @@ def royaltyInfo(tokenId: ByteString, royaltyToken: UInt160, salePrice: int) -> L
     return royalties
 
 @public(safe=True)
-def getLockedContentViewCount(tokenId: ByteString) -> int:
+def getLockedContentViewCount(tokenId: bytes) -> int:
     """
     Get lock content view count of a token.
 
     :param tokenId: the token to query
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :return: number of times the lock content of this token was accessed.
     """
     debug(['getLockedContentViewCount: ', get_locked_view_counter(tokenId)])
     return get_locked_view_counter(tokenId)
 
 @public
-def getLockedContent(tokenId: ByteString) -> ByteString:
+def getLockedContent(tokenId: bytes) -> bytes:
     """
     Get lock content of a token.
 
     :param tokenId: the token to query
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :return: the lock content of this token.
     :raise AssertionError: raised if witness is not owner
     :emits UnlockIncremented
@@ -543,8 +551,8 @@ def updatePause(status: bool) -> bool:
     expect(verified, 'updatePause - `account` is not allowed for updatePause')
     expect(isinstance(status, bool), "updatePause - status has to be of type bool")
     put(PAUSED, status)
-    debug(['updatePause: ', get(PAUSED, get_read_only_context()).to_bool()])
-    return get(PAUSED, get_read_only_context()).to_bool() 
+    debug(['updatePause: ', to_bool(get(PAUSED, get_read_only_context()))])
+    return to_bool(get(PAUSED, get_read_only_context())) 
 
 @public(safe=True)
 def isPaused() -> bool:
@@ -555,8 +563,8 @@ def isPaused() -> bool:
 
     :return: whether the contract is paused
     """
-    debug(['isPaused: ', get(PAUSED).to_bool()])
-    if get(PAUSED, get_read_only_context()).to_bool():
+    debug(['isPaused: ', to_bool(get(PAUSED))])
+    if to_bool(get(PAUSED, get_read_only_context())):
         return True
     return False
 
@@ -588,9 +596,9 @@ def update(script: bytes, manifest: bytes):
     Upgrade the contract.
 
     :param script: the contract script
-    :type script: ByteString
+    :type script: bytes
     :param manifest: the contract manifest
-    :type manifest: ByteString
+    :type manifest: bytes
     :raise AssertionError: raised if witness is not verified
     """
     verified: bool = verify()
@@ -610,12 +618,12 @@ def destroy():
     destroy_contract() 
     debug(['destroy called and done'])
 
-def internal_burn(tokenId: ByteString) -> bool:
+def internal_burn(tokenId: bytes) -> bool:
     """
     Burn a token - internal
 
     :param tokenId: the token to burn
-    :type tokenId: ByteString
+    :type tokenId: bytes
     :return: whether the burn was successful.
     :raise AssertionError: raised if `tokenId` is not a valid NFT.
     """
@@ -635,26 +643,26 @@ def internal_burn(tokenId: ByteString) -> bool:
     post_transfer(owner, None, tokenId, None)
     return True
 
-def internal_mint(account: UInt160, meta: ByteString, lockedContent: ByteString, royalties: ByteString) -> ByteString:
+def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties: bytes) -> bytes:
     """
     Mint new token - internal
 
     :param account: the address of the account that is minting token
     :type account: UInt160
     :param meta: the metadata to use for this token
-    :type meta: ByteString
+    :type meta: bytes
     :param lockedContent: the lock content to use for this token
-    :type lockedContent: ByteString
+    :type lockedContent: bytes
     :param royalties: the royalties to use for this token
-    :type royalties: ByteString
+    :type royalties: bytes
     :return: tokenId of the token minted
     :raise AssertionError: raised if meta is empty, or if contract is paused.
     """
     expect(len(meta) != 0, 'internal_mint - `meta` can not be empty')
 
-    tokenId = get(TOKEN_COUNT, get_read_only_context()).to_int() + 1
+    tokenId = to_int(get(TOKEN_COUNT, get_read_only_context())) + 1
     put(TOKEN_COUNT, tokenId)
-    tokenIdBytes = tokenId.to_bytes()
+    tokenIdBytes = to_bytes(tokenId)
     
     set_owner_of(tokenIdBytes, account)
     set_balance(account, 1)
@@ -676,7 +684,7 @@ def internal_mint(account: UInt160, meta: ByteString, lockedContent: ByteString,
     post_transfer(None, account, tokenIdBytes, None)
     return tokenIdBytes
 
-def validateRoyalties(bytes: ByteString) -> bool:
+def validateRoyalties(bytes: bytes) -> bool:
 
     strRoyalties: str = cast(str, bytes)
     deserialized = cast(List[Dict[str, str]], json_deserialize(strRoyalties))
@@ -686,28 +694,28 @@ def validateRoyalties(bytes: ByteString) -> bool:
             return False
     return True
 
-def remove_token_account(holder: UInt160, tokenId: ByteString):
+def remove_token_account(holder: UInt160, tokenId: bytes):
     key = mk_account_key(holder) + tokenId
     debug(['add_token_account: ', key, tokenId])
     delete(key)
 
-def add_token_account(holder: UInt160, tokenId: ByteString):
+def add_token_account(holder: UInt160, tokenId: bytes):
     key = mk_account_key(holder) + tokenId
     debug(['add_token_account: ', key, tokenId])
     put(key, tokenId)
 
-def get_owner_of(tokenId: ByteString) -> UInt160:
+def get_owner_of(tokenId: bytes) -> UInt160:
     key = mk_token_key(tokenId)
     debug(['get_owner_of: ', key, tokenId])
     owner = get(key, get_read_only_context())
     return UInt160(owner)
 
-def remove_owner_of(tokenId: ByteString):
+def remove_owner_of(tokenId: bytes):
     key = mk_token_key(tokenId)
     debug(['remove_owner_of: ', key, tokenId])
     delete(key)
 
-def set_owner_of(tokenId: ByteString, owner: UInt160):
+def set_owner_of(tokenId: bytes, owner: UInt160):
     key = mk_token_key(tokenId)
     debug(['set_owner_of: ', key, tokenId])
     put(key, owner)
@@ -728,45 +736,45 @@ def set_balance(owner: UInt160, amount: int):
     else:
         delete(key)
 
-def get_meta(tokenId: ByteString) -> ByteString:
+def get_meta(tokenId: bytes) -> bytes:
     key = mk_meta_key(tokenId)
     debug(['get_meta: ', key, tokenId])
     val = get(key, get_read_only_context())
     return val
 
-def remove_meta(tokenId: ByteString):
+def remove_meta(tokenId: bytes):
     key = mk_meta_key(tokenId)
     debug(['remove_meta: ', key, tokenId])
     delete(key)
 
-def add_meta(tokenId: ByteString, meta: ByteString):
+def add_meta(tokenId: bytes, meta: bytes):
     key = mk_meta_key(tokenId)
     debug(['add_meta: ', key, tokenId])
     put(key, meta)
 
-def get_locked_content(tokenId: ByteString) -> ByteString:
+def get_locked_content(tokenId: bytes) -> bytes:
     key = mk_locked_key(tokenId)
     debug(['get_locked_content: ', key, tokenId])
     val = get(key, get_read_only_context())
     return val
 
-def remove_locked_content(tokenId: ByteString):
+def remove_locked_content(tokenId: bytes):
     key = mk_locked_key(tokenId)
     debug(['remove_locked_content: ', key, tokenId])
     delete(key)
 
-def add_locked_content(tokenId: ByteString, content: ByteString):
+def add_locked_content(tokenId: bytes, content: bytes):
     key = mk_locked_key(tokenId)
     debug(['add_locked_content: ', key, tokenId])
     put(key, content)
 
-def get_royalties(tokenId: ByteString) -> ByteString:
+def get_royalties(tokenId: bytes) -> bytes:
     key = mk_royalties_key(tokenId)
     debug(['get_royalties: ', key, tokenId])
     val = get(key, get_read_only_context())
     return val
 
-def get_royalties_info(tokenId: ByteString, salePrice: int) -> List[List[Any]]:
+def get_royalties_info(tokenId: bytes, salePrice: int) -> List[List[Any]]:
     key = mk_royalties_key(tokenId)
     val = get(key, get_read_only_context())
 
@@ -788,43 +796,50 @@ def get_royalties_info(tokenId: ByteString, salePrice: int) -> List[List[Any]]:
             val = royalty["value"]
         amount: int = salePrice * val // 10000
         
-        recipient: UInt160 = cast(UInt160,(royalty["address"]).to_script_hash())
+        recipient: UInt160 = to_script_hash(cast(UInt160,(royalty["address"])))
         royalties.append(recipient)
         royalties.append(amount)
         result.append(royalties)
 
     return result
 
-def add_royalties(tokenId: ByteString, royalties: str):
+def add_royalties(tokenId: bytes, royalties: str):
     key = mk_royalties_key(tokenId)
     debug(['add_royalties: ', key, tokenId])
     put(key, royalties)
 
-def remove_royalties(tokenId: ByteString):
+def remove_royalties(tokenId: bytes):
     key = mk_royalties_key(tokenId)
     debug(['remove_royalties: ', key, tokenId])
     delete(key)
 
-def get_locked_view_counter(tokenId: ByteString) -> int:
+def get_locked_view_counter(tokenId: bytes) -> int:
     key = mk_lv_key(tokenId)
     debug(['get_locked_view_counter: ', key, tokenId])
-    return get(key, get_read_only_context()).to_int()
+    return to_int(get(key, get_read_only_context()))
 
-def remove_locked_view_counter(tokenId: ByteString):
+def remove_locked_view_counter(tokenId: bytes):
     key = mk_lv_key(tokenId)
     debug(['remove_locked_view_counter: ', key, tokenId])
     delete(key)
 
-def set_locked_view_counter(tokenId: ByteString):
+def set_locked_view_counter(tokenId: bytes):
     key = mk_lv_key(tokenId)
     debug(['set_locked_view_counter: ', key, tokenId])
-    count = get(key, get_read_only_context()).to_int() + 1
+    count = to_int(get(key, get_read_only_context())) + 1
     put(key, count)
 
-## helpers
+
+# -------------------------------------------
+# HELPERS
+# -------------------------------------------
 
 def expect(condition: bool, message: str):
-    assert condition, message
+    allow_notify = get_call_flags() & CallFlags.ALLOW_NOTIFY
+    if allow_notify == CallFlags.ALLOW_NOTIFY:
+        assert condition, message
+    else:
+        assert condition
 
 def validateAddress(address: UInt160) -> bool:
     if not isinstance(address, UInt160):
@@ -833,26 +848,26 @@ def validateAddress(address: UInt160) -> bool:
         return False
     return True
 
-def mk_account_key(address: UInt160) -> ByteString:
+def mk_account_key(address: UInt160) -> bytes:
     return ACCOUNT_PREFIX + address
 
-def mk_balance_key(address: UInt160) -> ByteString:
+def mk_balance_key(address: UInt160) -> bytes:
     return BALANCE_PREFIX + address
 
-def mk_token_key(tokenId: ByteString) -> ByteString:
+def mk_token_key(tokenId: bytes) -> bytes:
     return TOKEN_PREFIX + tokenId
 
-def mk_token_data_key(tokenId: ByteString) -> ByteString:
+def mk_token_data_key(tokenId: bytes) -> bytes:
     return TOKEN_DATA_PREFIX + tokenId
 
-def mk_meta_key(tokenId: ByteString) -> ByteString:
+def mk_meta_key(tokenId: bytes) -> bytes:
     return META_PREFIX + tokenId
 
-def mk_locked_key(tokenId: ByteString) -> ByteString:
+def mk_locked_key(tokenId: bytes) -> bytes:
     return LOCKED_PREFIX + tokenId
 
-def mk_royalties_key(tokenId: ByteString) -> ByteString:
+def mk_royalties_key(tokenId: bytes) -> bytes:
     return ROYALTIES_PREFIX + tokenId
 
-def mk_lv_key(tokenId: ByteString) -> ByteString:
+def mk_lv_key(tokenId: bytes) -> bytes:
     return LOCKED_VIEW_COUNT_PREFIX + tokenId
