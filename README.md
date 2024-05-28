@@ -1,4 +1,4 @@
-# NEP11TemplatePy
+# NEP11-Template.py
 Fully featured NEP-11 python contract to allow to easily deploy your own NFT minting contract, and make it seamless to integrate it on GhostMarket.
 
 
@@ -51,10 +51,12 @@ This contract features two methods to handle properties:
 This contract supports both methods for convenience purposes.
 
 ### Compiling contract
+Currently tested and working with neo3-boa 1.2.0
+
 ```
-.compile.py
+./compile.py
 or
-neo3-boa NEP11-Template.py
+neo3-boa compile NEP11-Template.py
 ```
 
 ### Deploying from neo-cli
@@ -71,14 +73,21 @@ update <scripthashcontract> <nef path> <manifest path> <scripthashaddress>
 
 ## Testing
 
+Dependencies required to be installed for testing:
+
+```
+pip install "neo3-boa[test]"
+pip3 install typing-extensions
+```
+
 tests can be run with:
 
 ```
-python -m unittest test_nep11
+python3 -m unittest test_nep11
 ```
 
 individual test can be run witn  
 ```
-python -m unittest test_nep11.NEP11Test.test_nep11_decimals
+python3 -m unittest test_nep11.TestNEP11.test_decimals
 ```
 

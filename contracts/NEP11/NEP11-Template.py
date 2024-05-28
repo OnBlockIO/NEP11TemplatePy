@@ -1,14 +1,15 @@
 from typing import Any, Dict, List, Union, cast
 
-from boa3.builtin.compile_time import CreateNewEvent, NeoMetadata, metadata, public
-from boa3.builtin.type.helper import to_int, to_bool, to_bytes
+from boa3.builtin.compile_time import CreateNewEvent, NeoMetadata, public
+from boa3.builtin.type.helper import to_bytes
 from boa3.builtin.interop.blockchain import get_contract, Transaction
 from boa3.builtin.interop.contract import CallFlags, call_contract, destroy_contract, get_call_flags, update_contract
 from boa3.builtin.interop.runtime import check_witness, script_container
 from boa3.builtin.interop.stdlib import serialize, deserialize, atoi
-from boa3.builtin.interop.storage import delete, get, put, find, get_read_only_context
+from boa3.builtin.interop.storage import delete, get, get_int, get_bool, get_uint160, put, put_bool, put_int, put_uint160, put_str, find, get_read_only_context
 from boa3.builtin.interop.storage.findoptions import FindOptions
 from boa3.builtin.interop.iterator import Iterator
+from boa3.builtin.contract import abort
 from boa3.builtin.type import UInt160
 from boa3.builtin.interop.json import json_deserialize
 from boa3.builtin.interop.runtime import get_network
@@ -18,7 +19,6 @@ from boa3.builtin.contract import to_script_hash
 # -------------------------------------------
 # METADATA
 # -------------------------------------------
-@metadata
 def manifest_metadata() -> NeoMetadata:
     """
     Defines this smart contract's metadata information
@@ -165,8 +165,8 @@ def totalSupply() -> int:
 
     :return: the total token supply deployed in the system.
     """
-    debug(['totalSupply: ', to_int(get(SUPPLY_PREFIX))])
-    return to_int(get(SUPPLY_PREFIX, get_read_only_context()))
+    debug(['totalSupply: ', get_int(SUPPLY_PREFIX)])
+    return get_int(SUPPLY_PREFIX, get_read_only_context())
 
 @public(safe=True)
 def balanceOf(owner: UInt160) -> int:
@@ -181,8 +181,8 @@ def balanceOf(owner: UInt160) -> int:
     :raise AssertionError: raised if `owner` length is not 20.
     """
     expect(validateAddress(owner), "balanceOf - not a valid address")
-    debug(['balanceOf: ', to_int(get(mk_balance_key(owner), get_read_only_context()))])
-    return to_int(get(mk_balance_key(owner), get_read_only_context()))
+    debug(['balanceOf: ', get_int(mk_balance_key(owner), get_read_only_context())])
+    return get_int(mk_balance_key(owner), get_read_only_context())
 
 @public(safe=True)
 def tokensOf(owner: UInt160) -> Iterator:
@@ -199,6 +199,22 @@ def tokensOf(owner: UInt160) -> Iterator:
     expect(validateAddress(owner), "tokensOf - not a valid address")
     flags = FindOptions.REMOVE_PREFIX | FindOptions.KEYS_ONLY
     return find(mk_account_key(owner), get_read_only_context(), flags)
+
+@public(name='onNEP11Payment')
+def on_nep11_payment(from_address: UInt160, amount: int, token_id: bytes, data: Any):
+    """
+    This contract will not receive another NEP-11 token.
+
+    :param from_address: the address of the one who is trying to send cryptocurrency to this smart contract
+    :type from_address: UInt160
+    :param amount: the amount of cryptocurrency that is being sent to the this smart contract
+    :type amount: int
+    :param token_id: the id of the token that is being sent
+    :type token_id: bytes
+    :param data: any pertinent data that might validate the transaction
+    :type data: Any
+    """
+    abort()
 
 @public
 def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
@@ -228,6 +244,7 @@ def transfer(to: UInt160, tokenId: bytes, data: Any) -> bool:
     expect(validateAddress(to), "transfer - not a valid address")
     expect(not isPaused(), "transfer - contract paused")
     token_owner = get_owner_of(tokenId)
+    expect(token_owner != UInt160.zero, "Token not found")
 
     if not check_witness(token_owner):
         return False
@@ -334,7 +351,7 @@ def _deploy(data: Any, upgrade: bool):
     if upgrade:
         return
 
-    if to_bool(get(DEPLOYED, get_read_only_context())):
+    if get_bool(DEPLOYED, get_read_only_context()):
         return
 
     tx = cast(Transaction, script_container)
@@ -358,9 +375,9 @@ def _deploy(data: Any, upgrade: bool):
 def internal_deploy(owner: UInt160):
 
     debug(["internal: ", owner])
-    put(DEPLOYED, True)
-    put(PAUSED, False)
-    put(TOKEN_COUNT, 0)
+    put_bool(DEPLOYED, True)
+    put_bool(PAUSED, False)
+    put_int(TOKEN_COUNT, 0)
 
     auth: List[UInt160] = []
     auth.append(owner)
@@ -550,9 +567,9 @@ def updatePause(status: bool) -> bool:
     verified: bool = verify()
     expect(verified, 'updatePause - `account` is not allowed for updatePause')
     expect(isinstance(status, bool), "updatePause - status has to be of type bool")
-    put(PAUSED, status)
-    debug(['updatePause: ', to_bool(get(PAUSED, get_read_only_context()))])
-    return to_bool(get(PAUSED, get_read_only_context())) 
+    put_bool(PAUSED, status)
+    debug(['updatePause: ', get_bool(PAUSED, get_read_only_context())])
+    return get_bool(PAUSED, get_read_only_context())
 
 @public(safe=True)
 def isPaused() -> bool:
@@ -563,8 +580,8 @@ def isPaused() -> bool:
 
     :return: whether the contract is paused
     """
-    debug(['isPaused: ', to_bool(get(PAUSED))])
-    if to_bool(get(PAUSED, get_read_only_context())):
+    debug(['isPaused: ', get_bool(PAUSED)])
+    if get_bool(PAUSED, get_read_only_context()):
         return True
     return False
 
@@ -615,8 +632,8 @@ def destroy():
     """
     verified: bool = verify()
     expect(verified, 'destroy - `account` is not allowed for destroy')
-    destroy_contract() 
     debug(['destroy called and done'])
+    destroy_contract() 
 
 def internal_burn(tokenId: bytes) -> bool:
     """
@@ -660,8 +677,8 @@ def internal_mint(account: UInt160, meta: bytes, lockedContent: bytes, royalties
     """
     expect(len(meta) != 0, 'internal_mint - `meta` can not be empty')
 
-    tokenId = to_int(get(TOKEN_COUNT, get_read_only_context())) + 1
-    put(TOKEN_COUNT, tokenId)
+    tokenId = get_int(TOKEN_COUNT, get_read_only_context()) + 1
+    put_int(TOKEN_COUNT, tokenId)
     tokenIdBytes = to_bytes(tokenId)
     
     set_owner_of(tokenIdBytes, account)
@@ -707,8 +724,8 @@ def add_token_account(holder: UInt160, tokenId: bytes):
 def get_owner_of(tokenId: bytes) -> UInt160:
     key = mk_token_key(tokenId)
     debug(['get_owner_of: ', key, tokenId])
-    owner = get(key, get_read_only_context())
-    return UInt160(owner)
+    owner = get_uint160(key, get_read_only_context())
+    return owner
 
 def remove_owner_of(tokenId: bytes):
     key = mk_token_key(tokenId)
@@ -718,12 +735,12 @@ def remove_owner_of(tokenId: bytes):
 def set_owner_of(tokenId: bytes, owner: UInt160):
     key = mk_token_key(tokenId)
     debug(['set_owner_of: ', key, tokenId])
-    put(key, owner)
+    put_uint160(key, owner)
 
 def add_to_supply(amount: int):
     total = totalSupply() + (amount)
     debug(['add_to_supply: ', amount])
-    put(SUPPLY_PREFIX, total)
+    put_int(SUPPLY_PREFIX, total)
 
 def set_balance(owner: UInt160, amount: int):
     old = balanceOf(owner)
@@ -732,7 +749,7 @@ def set_balance(owner: UInt160, amount: int):
 
     key = mk_balance_key(owner)
     if (new > 0):
-        put(key, new)
+        put_int(key, new)
     else:
         delete(key)
 
@@ -806,7 +823,7 @@ def get_royalties_info(tokenId: bytes, salePrice: int) -> List[List[Any]]:
 def add_royalties(tokenId: bytes, royalties: str):
     key = mk_royalties_key(tokenId)
     debug(['add_royalties: ', key, tokenId])
-    put(key, royalties)
+    put_str(key, royalties)
 
 def remove_royalties(tokenId: bytes):
     key = mk_royalties_key(tokenId)
@@ -816,7 +833,7 @@ def remove_royalties(tokenId: bytes):
 def get_locked_view_counter(tokenId: bytes) -> int:
     key = mk_lv_key(tokenId)
     debug(['get_locked_view_counter: ', key, tokenId])
-    return to_int(get(key, get_read_only_context()))
+    return get_int(key, get_read_only_context())
 
 def remove_locked_view_counter(tokenId: bytes):
     key = mk_lv_key(tokenId)
@@ -826,8 +843,8 @@ def remove_locked_view_counter(tokenId: bytes):
 def set_locked_view_counter(tokenId: bytes):
     key = mk_lv_key(tokenId)
     debug(['set_locked_view_counter: ', key, tokenId])
-    count = to_int(get(key, get_read_only_context())) + 1
-    put(key, count)
+    count = get_int(key, get_read_only_context()) + 1
+    put_int(key, count)
 
 
 # -------------------------------------------
@@ -835,11 +852,7 @@ def set_locked_view_counter(tokenId: bytes):
 # -------------------------------------------
 
 def expect(condition: bool, message: str):
-    allow_notify = get_call_flags() & CallFlags.ALLOW_NOTIFY
-    if allow_notify == CallFlags.ALLOW_NOTIFY:
-        assert condition, message
-    else:
-        assert condition
+    assert condition, message
 
 def validateAddress(address: UInt160) -> bool:
     if not isinstance(address, UInt160):
