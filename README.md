@@ -51,7 +51,7 @@ This contract features two methods to handle properties:
 This contract supports both methods for convenience purposes.
 
 ### Compiling contract
-Currently tested and working with neo3-boa 1.2.0
+Currently tested and working with neo3-boa 1.2.1
 
 ```
 ./compile.py
